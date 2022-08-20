@@ -6,20 +6,21 @@ from Utils.plotly import plot_confusion_matrixs
 from sklearn.preprocessing import LabelEncoder
 
 
-# 定义树节点（非叶子节点）
 class Node:
     def __init__(self, left, right, rule):
-        self.left = left  # 左孩子节点
-        self.right = right  # 右孩子节点
-        self.feature = rule[0]  # 叶子划分特征
-        self.threshold = rule[1]  # 叶子划分特征的阈值（二分）
+        self.left = left
+        self.right = right
+        self.feature = rule[0]
+        self.threshold = rule[1]
 
 
-# 定义叶子节点（没有孩子）
 class Leaf:
     def __init__(self, value):
-        self.value = value  # 当分类任务时，value是类别的概率数组；当连续任务时，value是平均值
-
+        """
+        `value` is an array of class probabilities if classifier is True, else
+        the mean of the region
+        """
+        self.value = value
 
 class DecisionTree(object):
     """
@@ -27,43 +28,66 @@ class DecisionTree(object):
     定义：类别--信息熵（香农熵）；特征--最大信息增益（ID3）、最大信息增益率（C4.5）、Gini系数（CART）
     求解：通过划分指标找出最佳特征作切分，使得每一个样本落到子叶节点中，构建出一棵能作推断的决策树。
     """
-    def __init__(self, classifier=True, max_depth=None, n_feats=None, criterion="entropy", seed=None):
+    def __init__(
+        self,
+        classifier=True,
+        max_depth=None,
+        n_feats=None,
+        criterion="entropy",
+        seed=None
+    ):
         """
-        创建可用于回归和分类问题的决策树模型.
-        参数如下:
+        A decision tree model for regression and classification problems.
+        Parameters
         ----------
-        classifier : bool 控制创建分类器还是回归器.
-        max_depth: int (None) 控制树的生长深度。默认为None，表示分裂至所有子叶节点都是纯的（包含一个类）
-        n_feats : int 指定每次分列时使用的特样本征数。默认为None，表示使用所有特征进行分裂损失的计算。
-        criterion : {'mse', 'entropy', 'gini'} 选择在计算分裂时使用的损失函数。分类模型使用entropy或者gini，回归使用mse。
-        seed : int (None) 随机数生成器的种子。默认为None。
+        classifier : bool
+            Whether to treat target values as categorical (classifier =
+            True) or continuous (classifier = False). Default is True.
+        max_depth: int or None
+            The depth at which to stop growing the tree. If None, grow the tree
+            until all leaves are pure. Default is None.
+        n_feats : int
+            Specifies the number of features to sample on each split. If None,
+            use all features on each split. Default is None.
+        criterion : {'mse', 'entropy', 'gini'}
+            The error criterion to use when calculating splits. When
+            `classifier` is False, valid entries are {'mse'}. When `classifier`
+            is True, valid entries are {'entropy', 'gini'}. Default is
+            'entropy'.
+        seed : int or None
+            Seed for the random number generator. Default is None.
         """
-        # 随机种子设置（确保每次的划分结果一致）
         if seed:
             np.random.seed(seed)
 
         self.depth = 0
         self.root = None
 
-        self.n_feats = n_feats  # 划分使用特征数
-        self.criterion = criterion  # 损失函数
-        self.classifier = classifier  # 任务选定
-        self.max_depth = max_depth if max_depth else np.inf  # 树的最大深度
+        self.n_feats = n_feats
+        self.criterion = criterion
+        self.classifier = classifier
+        self.max_depth = max_depth if max_depth else np.inf
 
-        if not classifier and criterion in ["gini", "entropy"]:  # 错误警示-分类器下的损失函数仅支持gini和信息熵
-            raise ValueError("{} is a valid criterion only when classifier = True.".format(criterion))
+        if not classifier and criterion in ["gini", "entropy"]:
+            raise ValueError(
+                "{} is a valid criterion only when classifier = True.".format(criterion)
+            )
         if classifier and criterion == "mse":
             raise ValueError("`mse` is a valid criterion only when classifier = False.")
 
     def fit(self, X, Y):
         """
-        训练数据集，构建决策树的函数.
-        参数如下:
+        Fit a binary decision tree to a dataset.
+        Parameters
         ----------
-        X : 输入np.array格式的训练集，形状为(N, M)，表示N个样本，M个特征
-        Y : 输入np.array格式的标签集，形状为(N, )，表示对N个样本的真实标注
+        X : :py:class:`ndarray <numpy.ndarray>` of shape `(N, M)`
+            The training data of `N` examples, each with `M` features
+        Y : :py:class:`ndarray <numpy.ndarray>` of shape `(N,)`
+            An array of integer class labels for each example in `X` if
+            self.classifier = True, otherwise the set of target values for
+            each example in `X`.
         """
-        self.n_classes = len(np.bincount(Y)) if self.classifier else None  # 对标签进行计数统计
+        self.n_classes = max(Y) + 1 if self.classifier else None
         self.n_feats = X.shape[1] if not self.n_feats else min(self.n_feats, X.shape[1])
         self.root = self._grow(X, Y)
 
@@ -217,8 +241,8 @@ def gini(y):
 
 if __name__ == "__main__":
     data_dir = "D:\python\code\Machine_Learning\datasets\Car-Evaluation.csv"
-    datasets = load_data(data_dir)  # 加载数据, 要求标签必须要混合均匀，每个特征和标签都要有对应
-    show_data(datasets, rows=5)  # 展示数据
+    datasets = load_data(data_dir) # 加载数据, 要求标签必须要混合均匀，每个特征和标签都要有对应
+    show_data(datasets, rows=5) # 展示数据
     # 标签化数据编码
     le = LabelEncoder()
     for col in datasets.columns:
@@ -229,12 +253,12 @@ if __name__ == "__main__":
     target = datasets.iloc[:, -1]  # 标签
     X_train, X_test, y_train, y_test = train_test_split(features, target, ratio=0.75, seed=2021)  # 切分数据集
     X_train, X_test, y_train, y_test = X_train.values, X_test.values, y_train.values, y_test.values  # 转化为numpy数组
-    start = time.time()  # 计算模型的训练时间
+    start = time.time() # 计算模型的训练时间
     DT = DecisionTree(criterion="entropy", seed=42)  # 实例化模型
     DT.fit(X_train, y_train)  # 训练模型
     y_pred = DT.predict(X_test)  # 预测新数据
     end = time.time()
-    print("Time cost: {:} s".format(np.round(end - start, 6)))  # 保留6位小数
+    print("Time cost: {:} s".format(np.round(end - start, 6))) # 保留6位小数
     print("-------------------Evaluate-------------------")
     acc = eval_cls_multiple(y_test, y_pred, metric="acc", average="macro")  # 多分类预测
     precision = eval_cls_multiple(y_test, y_pred, metric="precision", average="macro")
